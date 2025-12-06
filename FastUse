@@ -1,0 +1,47 @@
+package com.tripu1404.anticheat.checks; // PAQUETE ACTUALIZADO
+
+import cn.nukkit.Player;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.player.PlayerInteractEvent;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class FastUseCheck implements Listener {
+
+    private final Map<UUID, Long> lastUseTime = new HashMap<>();
+    private static final long MIN_DELAY_MS = 100; 
+
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getAction() != PlayerInteractEvent.Action.RIGHT_CLICK_AIR && 
+            event.getAction() != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+
+        Player player = event.getPlayer();
+        Item item = event.getItem();
+        long currentTime = System.currentTimeMillis();
+
+        if (item.getId() == ItemID.EXPERIENCE_BOTTLE || 
+            item.getId() == ItemID.SNOWBALL || 
+            item.getId() == ItemID.ENDER_PEARL) {
+            
+            long lastUse = lastUseTime.getOrDefault(player.getUniqueId(), 0L);
+            long timeDifference = currentTime - lastUse;
+
+            if (timeDifference < MIN_DELAY_MS) {
+                // Violación: El jugador está usando el ítem demasiado rápido
+                event.setCancelled(true);
+                return;
+            }
+
+            // Si es válido, actualiza el tiempo
+            lastUseTime.put(player.getUniqueId(), currentTime);
+        }
+    }
+}
