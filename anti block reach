@@ -1,0 +1,56 @@
+package com.tuplugin.anticheat.checks; // Reemplaza 'tuplugin' por el nombre de tu plugin
+
+import cn.nukkit.Player;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.block.BlockBreakEvent;
+import cn.nukkit.event.block.BlockPlaceEvent;
+import cn.nukkit.math.Vector3;
+
+public class ReachCheck implements Listener {
+
+    // Define el alcance máximo permitido de 6.0 bloques
+    private static final double MAX_REACH = 6.0;
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (event.isCancelled()) return;
+
+        Player player = event.getPlayer();
+        Vector3 blockPos = event.getBlock().getPosition();
+        Vector3 playerPos = player.getPosition();
+
+        // 1. Calcular la distancia real entre el jugador y el bloque
+        double distance = playerPos.distance(blockPos);
+
+        // 2. Verificar si excede el límite
+        if (distance > MAX_REACH) {
+            // Cancelar la acción si excede el alcance
+            event.setCancelled(true);
+            
+            // Puedes agregar tu lógica de notificación o VL aquí:
+            // player.sendMessage("§c[Anti-Cheat] ¡Alcance de bloque excedido al romper!");
+        }
+    }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (event.isCancelled()) return;
+
+        Player player = event.getPlayer();
+        Vector3 blockPos = event.getBlock().getPosition();
+        Vector3 playerPos = player.getPosition();
+
+        // 1. Calcular la distancia real entre el jugador y el bloque
+        double distance = playerPos.distance(blockPos);
+
+        // 2. Verificar si excede el límite
+        if (distance > MAX_REACH) {
+            // Cancelar la acción si excede el alcance
+            event.setCancelled(true);
+            
+            // Puedes agregar tu lógica de notificación o VL aquí:
+            // player.sendMessage("§c[Anti-Cheat] ¡Alcance de bloque excedido al colocar!");
+        }
+    }
+}
