@@ -1,0 +1,66 @@
+package com.tripu1404.anticheat.checks;
+
+import cn.nukkit.Player;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.player.PlayerMoveEvent;
+import cn.nukkit.level.Location;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
+
+public class NoSlowDownCheck implements Listener {
+
+    // Límite de velocidad horizontal (por tick) si el jugador está usando un ítem
+    // El movimiento normal es ~0.1 m/tick. Ralentizado debe ser <= 0.06 m/tick.
+    private static final double MAX_SLOWED_SPEED = 0.062; 
+    
+    // Margen de tolerancia para falsos positivos (por ejemplo, saltos o lag)
+    private static final double TOLERANCE = 0.005;
+
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        
+        // 1. Verificar si el jugador debería estar ralentizado
+        // En Nukkit, no hay un método simple 'isBlocking' como en Java, pero podemos verificar si está usando un ítem
+        // o si está a punto de usar un ítem que causa lentitud (comida, pociones, arcos, etc.)
+        
+        // Este chequeo es crucial: ¿el jugador está activamente usando (comiendo/bebiendo) algo?
+        // En Bedrock, las animaciones de uso de ítem (como comer) envían un paquete de inicio y fin.
+        // Nukkit utiliza el estado de uso de ítem o la duración de uso.
+        if (!player.isUsingItem()) {
+             return;
+        }
+
+        // Si el jugador está usando un ítem, obtenemos las posiciones
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        
+        // El movimiento vertical (Y) no nos interesa para este chequeo
+        double deltaX = to.getX() - from.getX();
+        double deltaZ = to.getZ() - from.getZ();
+        
+        // Distancia horizontal recorrida
+        double distanceHorizontal = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+        
+        // 2. Comprobar la velocidad
+        // Dado que este evento se dispara por cada movimiento (por tick), 
+        // la distancia recorrida es la velocidad por tick.
+        
+        // Usamos una pequeña tolerancia para evitar expulsar por movimientos minúsculos o lag
+        if (distanceHorizontal > MAX_SLOWED_SPEED + TOLERANCE) {
+            
+            // Violación detectada: Velocidad excesiva mientras se usa un ítem
+            
+            // Revertir el movimiento a la posición anterior para 'tirar' del jugador hacia atrás
+            player.teleport(from);
+            
+            // Cancelar el evento de movimiento
+            event.setCancelled(true); 
+
+            // (Opcional) Notificar o aplicar castigo VL
+            player.sendMessage("§c[Anti-Cheat] ¡Movimiento ilegal mientras usaba un ítem!");
+            // antiCheatCore.addViolation(player, "NoSlowDown", 1);
+        }
+    }
+}
