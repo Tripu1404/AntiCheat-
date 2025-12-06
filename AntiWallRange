@@ -1,0 +1,74 @@
+package com.tripu1404.anticheat.checks;
+
+import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.math.Vector3;
+
+public class WallReachCheck implements Listener {
+
+    // Alcance máximo permitido sin chequeo de pared (por ejemplo, 4.0 bloques)
+    private static final double NORMAL_REACH = 4.0;
+    
+    // Alcance máximo MÁS ALLÁ del cual el WallAura es casi seguro (ej. 6.0 bloques)
+    private static final double MAX_REACH_LIMIT = 6.0; 
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageByEntityEvent event) {
+        if (event.isCancelled()) return;
+
+        Entity damager = event.getDamager();
+        Entity entityHit = event.getEntity();
+
+        // Solo nos interesa cuando un jugador ataca a una entidad
+        if (!(damager instanceof Player)) return;
+
+        Player player = (Player) damager;
+        
+        // 1. Calcular distancia
+        double distance = player.distance(entityHit);
+        
+        // El WallAura se activa con alcances altos. Si el golpe está cerca, no chequeamos.
+        if (distance <= NORMAL_REACH) {
+            return;
+        }
+
+        // Si el golpe está MUY lejos, asumimos que es un cheat (KillAura o Reach normal)
+        if (distance > MAX_REACH_LIMIT) {
+            event.setCancelled(true);
+            // Aquí puedes registrar VL por Reach/KillAura
+            player.sendMessage("§c[Anti-Cheat] ¡Ataque demasiado lejos!");
+            return;
+        }
+        
+        // 2. Comprobar la Línea de Visión (Line of Sight Check)
+        
+        // Obtener la posición del ojo del jugador (punto de inicio del rayo)
+        Vector3 start = player.add(0, player.getEyeHeight(), 0);
+        
+        // Obtener la posición del bloque golpeado (punto final del rayo)
+        // Usamos la posición del centro de la entidad golpeada para mayor precisión
+        Vector3 end = entityHit.add(0, entityHit.getEyeHeight() / 2.0, 0); 
+        
+        // Nukkit proporciona un método para obtener el primer bloque no transparente en la línea de visión
+        Block blockObstructing = player.level.getBlockRayTrace(start, end, false);
+
+        // Si blockObstructing NO es null, significa que el rayo golpeó un bloque antes de llegar al objetivo.
+        if (blockObstructing != null && !blockObstructing.canPassThrough()) {
+            
+            // Verificamos que el bloque obstruyente no esté en la misma posición que el atacante o el objetivo.
+            if (!blockObstructing.equals(entityHit.getPosition().floor()) && !blockObstructing.equals(player.getPosition().floor())) {
+                
+                // 3. Bloqueo de WallAura
+                event.setCancelled(true);
+                player.sendMessage("§c[Anti-Cheat] ¡No puedes golpear a través de las paredes!");
+                
+                // Aquí puedes registrar VL por WallAura
+                // antiCheatCore.addViolation(player, "WallAura", 1);
+            }
+        }
+    }
+}
