@@ -1,0 +1,98 @@
+package com.tripu1404.anticheat.checks;
+
+import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.block.BlockPlaceEvent;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
+import cn.nukkit.math.Vector3;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class CrystalAuraCheck implements Listener {
+
+    // --- Configuración de Alcance (Wall Place Check) ---
+    private static final double MAX_REACH = 6.0; // Distancia máxima para colocación.
+    private static final double NORMAL_REACH = 4.5; // Distancia estándar de colocación.
+
+    // --- Configuración de Frecuencia (Fast Place Check) ---
+    // Tiempo mínimo entre colocaciones de cristal (en milisegundos). 
+    // 250ms es seguro, 100ms es muy estricto.
+    private static final long MIN_DELAY_MS = 250; 
+    private final Map<UUID, Long> lastPlaceTime = new HashMap<>();
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (event.isCancelled()) return;
+
+        Player player = event.getPlayer();
+        Item item = event.getItem();
+
+        // 1. Identificar si el ítem colocado es un Cristal del End (ID 426 en Bedrock/Nukkit)
+        if (item.getId() != ItemID.END_CRYSTAL) {
+            return;
+        }
+
+        // --- Chequeo A: Colocación Rápida (Fast Place / Múltiple) ---
+        long currentTime = System.currentTimeMillis();
+        long lastPlace = lastPlaceTime.getOrDefault(player.getUniqueId(), 0L);
+        long timeDifference = currentTime - lastPlace;
+
+        if (timeDifference < MIN_DELAY_MS) {
+            // Violación: Intentó colocar múltiples cristales demasiado rápido.
+            event.setCancelled(true);
+            player.sendMessage("§c[Anti-Cheat] ¡Colocación de Cristal demasiado rápida!");
+            // antiCheatCore.addViolation(player, "FastCrystal", 1);
+            return; // Bloqueado, no seguir con el chequeo de pared
+        }
+
+        // Si pasó el chequeo de velocidad, actualiza el tiempo de colocación.
+        lastPlaceTime.put(player.getUniqueId(), currentTime);
+
+        // --- Chequeo B: Colocación a Través de Paredes (Wall Place) ---
+        Block blockPlaced = event.getBlock();
+        
+        // Calcular la distancia entre el jugador y el bloque base donde se coloca el cristal.
+        double distance = player.distance(blockPlaced);
+
+        // Si está dentro del alcance normal, no hay problema
+        if (distance <= NORMAL_REACH) {
+            return; 
+        }
+
+        // Si la distancia es mayor al alcance máximo de colocación, es un Reach/CrystalAura simple
+        if (distance > MAX_REACH) {
+             event.setCancelled(true);
+             player.sendMessage("§c[Anti-Cheat] ¡Alcance de colocación de Cristal excedido!");
+             return;
+        }
+        
+        // Si la distancia es sospechosa (entre 4.5 y 6.0), comprobamos la línea de visión
+        
+        // Punto de inicio del rayo (Ojo del jugador)
+        Vector3 start = player.add(0, player.getEyeHeight(), 0);
+        
+        // Punto final del rayo (Centro del bloque base)
+        Vector3 end = blockPlaced.add(0.5, 0.5, 0.5); 
+        
+        // Obtener el primer bloque no transparente en la línea de visión
+        Block blockObstructing = player.level.getBlockRayTrace(start, end, false);
+
+        // Si se encuentra un bloque obstruyente que no es transparente
+        if (blockObstructing != null && !blockObstructing.canPassThrough()) {
+            
+            // Verificamos que el bloque obstruyente no esté en la misma posición que el jugador o el bloque de colocación
+            if (!blockObstructing.equals(blockPlaced.getPosition().floor())) {
+                
+                // Violación: Colocación a través de una pared
+                event.setCancelled(true);
+                player.sendMessage("§c[Anti-Cheat] ¡No puedes colocar cristales a través de las paredes!");
+                // antiCheatCore.addViolation(player, "WallCrystal", 1);
+            }
+        }
+    }
+}
